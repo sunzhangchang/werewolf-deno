@@ -1,0 +1,13 @@
+{
+    "roles": {
+        "werewolf": 1,
+        "villager": 1,
+        "hunter": 1,
+        "witch": 1
+    },
+    "target": "side",
+    "pass": [
+        "过",
+        "pass"
+    ]
+}

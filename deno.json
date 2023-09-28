@@ -1,0 +1,26 @@
+{
+    "tasks": {
+        "dev": "deno run --watch main.ts"
+    },
+    "imports": {
+        "std/server": "https://deno.land/std@0.203.0/http/server.ts",
+        "std/path": "https://deno.land/std@0.203.0/path/mod.ts",
+        "std/crypto": "https://deno.land/std@0.203.0/crypto/mod.ts",
+        "std/encoding/hex": "https://deno.land/std@0.203.0/encoding/hex.ts",
+        "std/json": "https://deno.land/std@0.203.0/json/mod.ts",
+        "socket.io": "https://deno.land/x/socket_io@0.2.0/mod.ts",
+        "crypto-js": "npm:crypto-js@^4.1.1",
+        "lodash": "npm:lodash@^4.17.21"
+    },
+    "fmt": {
+        "useTabs": false,
+        "indentWidth": 4,
+        "semiColons": false,
+        "singleQuote": true,
+        "exclude": ["dist/"]
+    },
+    "lint": {
+        "rules": {
+        }
+    }
+}
