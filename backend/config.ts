@@ -12,7 +12,7 @@ export interface TokenConfigType {
 }
 
 export const loadConfig = (): ConfigType =>
-    JSON.parse(Deno.readTextFileSync('./cfg.json'))
+    JSON.parse(Deno.readTextFileSync('./backend/cfg.json'))
 
 export const getTokens = (): TokenConfigType =>
-    JSON.parse(Deno.readTextFileSync('./tokens.json').toString())
+    JSON.parse(Deno.readTextFileSync('./backend/tokens.json').toString())

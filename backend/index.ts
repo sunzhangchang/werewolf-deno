@@ -54,7 +54,7 @@ const server = new HttpServer({
             console.log(url)
 
             if (url === '/') {
-                const data = await Deno.readTextFile('../dist/index.html')
+                const data = await Deno.readTextFile('./dist/index.html')
 
                 return new Response(data, {
                     status: 200,
@@ -63,7 +63,7 @@ const server = new HttpServer({
                     },
                 })
             } else if (url.startsWith('/assets')) {
-                const data = await Deno.readTextFile(join('../dist/', url))
+                const data = await Deno.readTextFile(join('./dist/', url))
 
                 return new Response(data, {
                     status: 200,
