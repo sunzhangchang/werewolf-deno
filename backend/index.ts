@@ -105,9 +105,7 @@ interface LoginResultType {
 io.on('connection', (socket) => {
     socket.on('login', (token: string) => {
         if (users[socket.id]) return
-        const username = Deno.env.has('DEV')
-            ? token
-            : getTokens().tokens[md5(token)]
+        const username = Deno.env.get('dev') || Deno.env.get('DEV') ? token : getTokens().tokens[md5(token)]
         if (!username) return
         if (socketId[username]) return
         if (username.length >= 20) return
@@ -136,6 +134,7 @@ io.on('connection', (socket) => {
         if (!username) return
         if (message.trim().length === 0) return
         const dec = sea(message)
+        if (dec.trim().length === 0) return
         if (getTokens()['admins'].includes(username) && dec.startsWith('/')) {
             // if (parseCommand(message))
             const commandResult = parseCommand(username, dec)
@@ -162,6 +161,7 @@ io.on('connection', (socket) => {
 
     socket.on('disconnect', () => {
         const username = users[socket.id]
+        if (!username) return
         game.handleLeave(username)
         delete users[socket.id]
         delete socketId[username]
@@ -230,6 +230,18 @@ io.on('connection', (socket) => {
         game.handleSeer(player, id)
     })
 
+    socket.on('guardProtect', (id) => {
+        const player = users[socket.id]
+        if (!player) return
+        game.handleGuardProtect(player, id)
+    })
+
+    socket.on('guardSkip', () => {
+        const player = users[socket.id]
+        if (!player) return
+        game.handleGuardSkip(player)
+    })
+
     socket.on('witchSave', () => {
         const player = users[socket.id]
         if (!player) return
@@ -270,14 +282,15 @@ io.on('connection', (socket) => {
 })
 
 export interface StateType {
-    state: GameState
+    state: GameState,
     day: number
-    dead?: Array<number>
-    seerResult?: boolean
-    waiting?: number
-    voteResult?: Record<number, number>
-    witchInventory?: WitchInventory
-    werewolfKilled?: Array<number>
+    dead?: Array<number>,
+    seerResult?: boolean,
+    waiting?: number,
+    voteResult?: Record<number, number>,
+    witchInventory?: WitchInventory,
+    guardLastProtect?: string,
+    werewolfKilled?: Array<number>,
     discussPlayers?: Array<string>
 }
 
@@ -286,7 +299,7 @@ const sendStart = (players: Array<string>, roles: Record<string, Role>) => {
         console.log('send', roles[name], name)
         io.to(id).emit('gameStart', {
             role: roles[name],
-            players,
+            players
         })
     })
 }
@@ -296,11 +309,10 @@ export const updateState = (state: StateType, id = room) => {
     io.to(id).emit('updateUsers', getPlayerStates())
 }
 
-export const sendDiscuss = (player: string, message: string) =>
-    io.to(room).emit('receiveDiscuss', {
-        player,
-        message: aes(message),
-    })
+export const sendDiscuss = (player: string, message: string) => io.to(room).emit('receiveDiscuss', {
+    player,
+    message: aes(message),
+})
 
 export const updateWitchState = (day: number) => {
     Object.entries(users).forEach(([id, name]) => {
@@ -317,7 +329,25 @@ export const updateWitchState = (day: number) => {
             dead: hasSave(name) ? getWerewolfKill() : [],
             seerResult,
             witchInventory: getWitchInventory(name),
-            day,
+            day
+        }, id)
+    })
+}
+
+export const updateGuardState = (day: number) => {
+    Object.entries(users).forEach(([id, name]) => {
+        const playerId = getId(name)
+        let guardLastProtect: string = ''
+        const role = getRoles()[name]
+        if (checkId(playerId)) {
+            if (role === 'guard' && getPlayerStates()[name] === 'alive') {
+                guardLastProtect = getGuardLastProtect(name)
+            }
+        }
+        updateState({
+            state: 'guard',
+            guardLastProtect,
+            day
         }, id)
     })
 }
@@ -325,7 +355,7 @@ export const updateWitchState = (day: number) => {
 export const sendHunterKilled = (player: number, target: number) => {
     io.to(room).emit('hunterKilled', {
         player,
-        target,
+        target
     })
 }
 
@@ -344,7 +374,7 @@ export const sendWerewolfResult = () => {
             result.push(k)
         }
     })
-    result.forEach((e) => {
+    result.forEach(e => {
         io.to(socketId[e]).emit('werewolfResult', getWerewolfResult())
     })
 }
@@ -357,7 +387,7 @@ const secret = 'hzgang06'
 
 const aes = (raw: string) => {
     // return cryptr.encrypt(raw)
-    return CryptoJS.AES.encrypt(raw, secret).toString()
+    return CryptoJS.AES.encrypt(raw, secret).toString();
     // const cipher = createCipheriv('aes-256-cbc', key, iv);
     // cipher.update(raw, 'utf8', 'hex')
     // return cipher.final('hex')
@@ -365,7 +395,7 @@ const aes = (raw: string) => {
 
 const sea = (raw: string) => {
     // return cryptr.decrypt(raw)
-    return CryptoJS.AES.decrypt(raw, secret).toString(CryptoJS.enc.Utf8)
+    return CryptoJS.AES.decrypt(raw, secret).toString(CryptoJS.enc.Utf8);
     // const decipher = createDecipheriv('aes-256-cbc', key, iv);
     // decipher.update(raw, 'hex', 'utf8')
     // return decipher.final('utf8')
@@ -375,9 +405,7 @@ const parseCommand = (player: string, command: string) => {
     const args = command.split(' ')
     console.log(args)
     if (args[0] === '/mute') {
-        if (args.length !== 3) {
-            return `excepted 2 arguments but got ${args.length - 1}.`
-        }
+        if (args.length !== 3) return `excepted 2 arguments but got ${args.length - 1}.`
         const time = parseInt(args[2])
         if (Number.isNaN(time) || time <= 0) return `${args[2]} is illegal.`
         const user = args[1]
@@ -393,16 +421,11 @@ const parseCommand = (player: string, command: string) => {
         //     username: serverUsername,
         //     message: aes(`人生自古谁无死？不幸的，${user} 已被管理员 ${player} 禁言 ${time} 秒。`)
         // })
-        sendServerMessage(
-            room,
-            `人生自古谁无死？不幸的，${user} 已被管理员 ${player} 禁言 ${time} 秒。`,
-        )
+        sendServerMessage(room, `人生自古谁无死？不幸的，${user} 已被管理员 ${player} 禁言 ${time} 秒。`)
         return `Muted ${user} for ${time} seconds.`
     }
     if (args[0] === '/unmute') {
-        if (args.length !== 2) {
-            return `excepted 1 arguments but got ${args.length - 1}.`
-        }
+        if (args.length !== 2) return `excepted 1 arguments but got ${args.length - 1}.`
         const user = args[1]
         if (!socketId[user]) return `${user} is offline.`
         if (mute[user].getTime() < Date.now()) return `${user} isn't muted now.`
@@ -410,18 +433,14 @@ const parseCommand = (player: string, command: string) => {
         //     username: serverUsername,
         //     message: aes(`遗憾的，你已被管理员 ${player} 解除禁言。`)
         // })
-        sendServerMessage(
-            room,
-            `遗憾的，${user} 已被管理员 ${player} 解除禁言。`,
-        )
+        sendServerMessage(room, `遗憾的，${user} 已被管理员 ${player} 解除禁言。`)
         mute[user] = new Date(0)
         return `Unmuted ${user}.`
     }
     return 'Unknown command.'
 }
 
-export const sendServerMessage = (id: string, message: string) =>
-    io.to(id).emit('receiveMessage', {
-        username: serverUsername,
-        message: aes(message),
-    })
+export const sendServerMessage = (id: string, message: string) => io.to(id).emit('receiveMessage', {
+    username: serverUsername,
+    message: aes(message)
+})
